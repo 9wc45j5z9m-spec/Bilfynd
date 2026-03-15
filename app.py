@@ -1,16 +1,16 @@
 import os
 import random
-from flask import Flask, request, jsonify
+from flask import Flask, request
 
 app = Flask(__name__)
 
 cars = [
-{"title":"Volvo V90 D4","brand":"Volvo","price":219000,"days":5},
-{"title":"Audi A6 Avant","brand":"Audi","price":229000,"days":18},
-{"title":"BMW 520d Touring","brand":"BMW","price":239000,"days":10},
-{"title":"Toyota RAV4 Hybrid","brand":"Toyota","price":259000,"days":3},
-{"title":"Tesla Model 3","brand":"Tesla","price":349000,"days":1},
-{"title":"Mercedes E220d","brand":"Mercedes","price":279000,"days":25}
+{"title":"Volvo V90 D4","brand":"Volvo","price":219000,"days":5,"link":"https://www.blocket.se"},
+{"title":"Audi A6 Avant","brand":"Audi","price":229000,"days":18,"link":"https://www.blocket.se"},
+{"title":"BMW 520d Touring","brand":"BMW","price":239000,"days":10,"link":"https://www.wayke.se"},
+{"title":"Toyota RAV4 Hybrid","brand":"Toyota","price":259000,"days":3,"link":"https://www.bytbil.com"},
+{"title":"Tesla Model 3","brand":"Tesla","price":349000,"days":1,"link":"https://www.blocket.se"},
+{"title":"Mercedes E220d","brand":"Mercedes","price":279000,"days":25,"link":"https://www.bytbil.com"}
 ]
 
 
@@ -18,8 +18,7 @@ def analyze_deal(price, days):
 
     market_price = int(price * 1.15)
 
-    discount = market_price - price
-    percent = round((discount / market_price) * 100)
+    percent = round(((market_price-price)/market_price)*100)
 
     recommended_bid = int(price * 0.9)
 
@@ -30,7 +29,7 @@ def analyze_deal(price, days):
     else:
         label = "Normal"
 
-    seller_signal = "Normal"
+    seller_signal = ""
 
     if days > 20:
         seller_signal = "📉 Motiverad säljare"
@@ -41,22 +40,25 @@ def analyze_deal(price, days):
 def pro_scan():
 
     sources = [
-    "Blocket",
-    "Wayke",
-    "Bytbil"
+    ("Blocket","https://www.blocket.se"),
+    ("Wayke","https://www.wayke.se"),
+    ("Bytbil","https://www.bytbil.com")
     ]
 
     found = []
 
-    for i in range(10):
+    for i in range(12):
+
+        source = random.choice(sources)
 
         found.append({
 
-        "title":f"Bilfynd {i+1}",
+        "title":f"Bilannons {i+1}",
         "brand":random.choice(["Volvo","BMW","Audi","Toyota"]),
         "price":random.randint(180000,320000),
         "days":random.randint(1,30),
-        "source":random.choice(sources)
+        "link":source[1],
+        "source":source[0]
 
         })
 
@@ -68,60 +70,43 @@ def scan():
 
     results = pro_scan()
 
-    return {"found":results}
+    html = "<h1>🔎 Scannerresultat</h1>"
 
+    for car in results:
 
-@app.route("/api/cars")
-def api():
+        html += f"""
+        <div style='border:1px solid #ccc;padding:10px;margin:10px'>
 
-    return jsonify(cars)
+        <h2>{car['title']}</h2>
+
+        <p>Märke: {car['brand']}</p>
+
+        <p>Pris: {car['price']} kr</p>
+
+        <p>Källa: {car['source']}</p>
+
+        <a href="{car['link']}" target="_blank">🔗 Öppna annons</a>
+
+        </div>
+        """
+
+    return html
 
 
 @app.route("/")
 def home():
 
-    brand_filter = request.args.get("brand")
-    max_price = request.args.get("max_price")
-
-    filtered = cars
-
-    if brand_filter:
-        filtered = [c for c in filtered if c["brand"] == brand_filter]
-
-    if max_price:
-        filtered = [c for c in filtered if c["price"] <= int(max_price)]
-
     html = """
-    <h1>🔥 Bilfynd Pro</h1>
+    <h1>🔥 Bilfynd AI</h1>
 
-    <form>
-
-    Märke:
-    <select name="brand">
-    <option value="">Alla</option>
-    <option>Volvo</option>
-    <option>Audi</option>
-    <option>BMW</option>
-    <option>Toyota</option>
-    <option>Tesla</option>
-    <option>Mercedes</option>
-    </select>
-
-    Maxpris:
-    <input name="max_price" placeholder="t.ex 250000">
-
-    <button>Filtrera</button>
-
-    </form>
-
-    <p><a href="/scan">🚀 Kör Pro Scanner</a></p>
+    <p><a href="/scan">🚀 Kör AI Scanner</a></p>
 
     <hr>
     """
 
     deals = []
 
-    for car in filtered:
+    for car in cars:
 
         market_price, percent, label, recommended_bid, seller_signal = analyze_deal(car["price"],car["days"])
 
@@ -149,6 +134,10 @@ def home():
 
         <p>AI rekommenderat bud: {recommended_bid} kr</p>
 
+        <a href="{car['link']}" target="_blank">🔗 Öppna annons</a>
+
+        <br><br>
+
         <form action='/bid'>
 
         <input name='car' value='{car['title']}' hidden>
@@ -171,7 +160,7 @@ def home():
 
         if percent > 10:
 
-            html += f"<p>{car['title']} - {percent}% under marknad</p>"
+            html += f"<p><a href='{car['link']}' target='_blank'>{car['title']}</a> - {percent}% under marknad</p>"
 
     return html
 
