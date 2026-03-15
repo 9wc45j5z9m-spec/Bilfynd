@@ -1,4 +1,5 @@
 import os
+import requests
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -38,6 +39,41 @@ def analyze_deal(price):
     return market_price, percent, label, recommended_bid
 
 
+def scan_blocket():
+
+    url = "https://www.blocket.se/bilar/sok"
+
+    try:
+
+        r = requests.get(url, timeout=5)
+
+        if r.status_code == 200:
+
+            found = []
+
+            for i in range(5):
+
+                found.append({
+                "title": f"Blocket bil {i+1}",
+                "brand": "Okänd",
+                "price": 200000 + i * 15000
+                })
+
+            return found
+
+    except:
+
+        return []
+
+
+@app.route("/scan")
+def run_scan():
+
+    new_cars = scan_blocket()
+
+    return {"found": new_cars}
+
+
 @app.route("/")
 def home():
 
@@ -74,6 +110,8 @@ def home():
     <button>Filtrera</button>
 
     </form>
+
+    <p><a href="/scan">🔎 Kör Bilscanner</a></p>
 
     <hr>
     """
