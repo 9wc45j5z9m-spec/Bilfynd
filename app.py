@@ -1,20 +1,29 @@
 import os
-from flask import Flask, request
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 cars = [
-    {"title": "Volvo V90 D4", "brand": "Volvo", "price": 219000},
-    {"title": "Audi A6 Avant", "brand": "Audi", "price": 229000},
-    {"title": "BMW 520d Touring", "brand": "BMW", "price": 239000},
-    {"title": "Toyota RAV4 Hybrid", "brand": "Toyota", "price": 259000}
+{"title":"Volvo V90 D4","brand":"Volvo","price":219000},
+{"title":"Audi A6 Avant","brand":"Audi","price":229000},
+{"title":"BMW 520d Touring","brand":"BMW","price":239000},
+{"title":"Toyota RAV4 Hybrid","brand":"Toyota","price":259000},
+{"title":"Tesla Model 3","brand":"Tesla","price":349000},
+{"title":"Mercedes E220d","brand":"Mercedes","price":279000}
 ]
+
+
+@app.route("/api/cars")
+def cars_api():
+    return jsonify(cars)
 
 
 def analyze_deal(price):
 
     market_price = int(price * 1.15)
+
     discount = market_price - price
+
     percent = round((discount / market_price) * 100)
 
     if percent > 20:
@@ -47,6 +56,7 @@ def home():
     <h1>🔥 Bilfynd</h1>
 
     <form>
+
     Märke:
     <select name="brand">
     <option value="">Alla</option>
@@ -54,12 +64,15 @@ def home():
     <option>Audi</option>
     <option>BMW</option>
     <option>Toyota</option>
+    <option>Tesla</option>
+    <option>Mercedes</option>
     </select>
 
     Maxpris:
-    <input name="max_price" placeholder="t.ex 230000">
+    <input name="max_price" placeholder="t.ex 250000">
 
     <button>Filtrera</button>
+
     </form>
 
     <hr>
@@ -74,6 +87,7 @@ def home():
         deals.append((percent, car))
 
         html += f"""
+
         <div style='border:1px solid #ccc;padding:10px;margin:10px'>
 
         <h2>{car['title']}</h2>
@@ -91,20 +105,28 @@ def home():
         <p>AI rekommenderat bud: {recommended_bid} kr</p>
 
         <form action='/bid'>
+
         <input name='car' value='{car['title']}' hidden>
+
         <input name='bid' placeholder='Ditt bud'>
+
         <button>Skicka bud</button>
+
         </form>
 
         </div>
+
         """
 
     html += "<h2>📡 Deal Radar</h2>"
 
     deals.sort(key=lambda x: x[0], reverse=True)
 
-    for percent, car in deals[:3]:
-        html += f"<p>{car['title']} - {percent}% under marknad</p>"
+    for percent, car in deals:
+
+        if percent > 10:
+
+            html += f"<p>{car['title']} - {percent}% under marknad</p>"
 
     return html
 
@@ -116,6 +138,7 @@ def bid():
     bid = request.args.get("bid")
 
     return f"""
+
     <h2>Mail att skicka</h2>
 
     <p>Hej,</p>
@@ -127,9 +150,12 @@ def bid():
     <p>Jag utlovar en smidig affär om du accepterar mitt bud.</p>
 
     <p>Vänligen återkom till mig.</p>
+
     """
 
 
 if __name__ == "__main__":
+
     port = int(os.environ.get("PORT", 5000))
+
     app.run(host="0.0.0.0", port=port)
