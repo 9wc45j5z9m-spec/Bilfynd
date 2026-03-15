@@ -1,8 +1,8 @@
 import os
-import random
 import sqlite3
-import time
-from flask import Flask, request
+import requests
+from flask import Flask
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 
@@ -15,9 +15,7 @@ def init_db():
     c.execute("""
     CREATE TABLE IF NOT EXISTS cars(
         title TEXT,
-        brand TEXT,
         price INTEGER,
-        days INTEGER,
         link TEXT,
         source TEXT
     )
@@ -33,12 +31,10 @@ def save_car(car):
     c = conn.cursor()
 
     c.execute("""
-    INSERT INTO cars VALUES (?,?,?,?,?,?)
+    INSERT INTO cars VALUES (?,?,?,?)
     """,(
         car["title"],
-        car["brand"],
         car["price"],
-        car["days"],
         car["link"],
         car["source"]
     ))
@@ -62,74 +58,62 @@ def get_cars():
 
         cars.append({
         "title":r[0],
-        "brand":r[1],
-        "price":r[2],
-        "days":r[3],
-        "link":r[4],
-        "source":r[5]
+        "price":r[1],
+        "link":r[2],
+        "source":r[3]
         })
 
     return cars
 
 
-def analyze(price,days):
+def crawl_blocket():
 
-    market=int(price*1.15)
+    url="https://www.blocket.se/bilar/sok"
 
-    percent=round(((market-price)/market)*100)
+    r=requests.get(url,headers={"User-Agent":"Mozilla/5.0"})
 
-    bid=int(price*0.9)
+    soup=BeautifulSoup(r.text,"html.parser")
 
-    label="Normal"
+    ads=soup.find_all("a",href=True)
 
-    if percent>20:
-        label="🔥 SUPER DEAL"
+    found=[]
 
-    elif percent>10:
-        label="✅ Bra pris"
+    for a in ads:
 
-    seller=""
+        link=a["href"]
 
-    if days>20:
-        seller="📉 Motiverad säljare"
+        if "/annons/" in link:
 
-    return market,percent,label,bid,seller
+            full_link="https://www.blocket.se"+link
+
+            title=a.text.strip()
+
+            if len(title)>5:
+
+                car={
+
+                "title":title,
+                "price":200000,
+                "link":full_link,
+                "source":"Blocket"
+
+                }
+
+                found.append(car)
+
+    return found[:20]
 
 
-def mega_crawl():
+@app.route("/crawl")
+def run_crawler():
 
-    brands=["Volvo","Audi","BMW","Toyota","Tesla","Mercedes"]
+    cars=crawl_blocket()
 
-    sources=[
-    ("Blocket","https://www.blocket.se"),
-    ("Wayke","https://www.wayke.se"),
-    ("Bytbil","https://www.bytbil.com")
-    ]
-
-    for i in range(200):
-
-        src=random.choice(sources)
-
-        car={
-
-        "title":f"Bil {random.randint(10000,99999)}",
-        "brand":random.choice(brands),
-        "price":random.randint(150000,400000),
-        "days":random.randint(1,30),
-        "link":src[1],
-        "source":src[0]
-
-        }
+    for car in cars:
 
         save_car(car)
 
-
-@app.route("/mega")
-def run_mega():
-
-    mega_crawl()
-
-    return "Mega crawler körd! Uppdatera startsidan."
+    return "Crawler klar! Gå tillbaka till startsidan."
 
 
 @app.route("/")
@@ -138,20 +122,14 @@ def home():
     cars=get_cars()
 
     html="""
-    <h1>🔥 Bilfynd Mega</h1>
+    <h1>🚗 Bilfynd Scanner</h1>
 
-    <p><a href="/mega">🚀 Kör Mega Crawler</a></p>
+    <p><a href="/crawl">🔎 Kör crawler</a></p>
 
     <hr>
     """
 
-    deals=[]
-
     for car in cars:
-
-        market,percent,label,bid,seller=analyze(car["price"],car["days"])
-
-        deals.append((percent,car))
 
         html+=f"""
 
@@ -159,39 +137,13 @@ def home():
 
         <h2>{car['title']}</h2>
 
-        <p>Märke: {car['brand']}</p>
-
         <p>Källa: {car['source']}</p>
-
-        <p>Pris: {car['price']} kr</p>
-
-        <p>Annons ute: {car['days']} dagar</p>
-
-        <p>Marknadspris: {market} kr</p>
-
-        <p>Pris under marknad: {percent}%</p>
-
-        <p>{label}</p>
-
-        <p>{seller}</p>
-
-        <p>AI budförslag: {bid} kr</p>
 
         <a href="{car['link']}" target="_blank">🔗 Öppna annons</a>
 
         </div>
 
         """
-
-    html+="<h2>📡 Deal Radar</h2>"
-
-    deals.sort(key=lambda x:x[0],reverse=True)
-
-    for percent,car in deals:
-
-        if percent>10:
-
-            html+=f"<p><a href='{car['link']}' target='_blank'>{car['title']}</a> - {percent}% under marknad</p>"
 
     return html
 
