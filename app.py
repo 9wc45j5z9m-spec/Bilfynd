@@ -1,31 +1,27 @@
 import os
-import requests
+import random
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 cars = [
-{"title":"Volvo V90 D4","brand":"Volvo","price":219000},
-{"title":"Audi A6 Avant","brand":"Audi","price":229000},
-{"title":"BMW 520d Touring","brand":"BMW","price":239000},
-{"title":"Toyota RAV4 Hybrid","brand":"Toyota","price":259000},
-{"title":"Tesla Model 3","brand":"Tesla","price":349000},
-{"title":"Mercedes E220d","brand":"Mercedes","price":279000}
+{"title":"Volvo V90 D4","brand":"Volvo","price":219000,"days":5},
+{"title":"Audi A6 Avant","brand":"Audi","price":229000,"days":18},
+{"title":"BMW 520d Touring","brand":"BMW","price":239000,"days":10},
+{"title":"Toyota RAV4 Hybrid","brand":"Toyota","price":259000,"days":3},
+{"title":"Tesla Model 3","brand":"Tesla","price":349000,"days":1},
+{"title":"Mercedes E220d","brand":"Mercedes","price":279000,"days":25}
 ]
 
 
-@app.route("/api/cars")
-def cars_api():
-    return jsonify(cars)
-
-
-def analyze_deal(price):
+def analyze_deal(price, days):
 
     market_price = int(price * 1.15)
 
     discount = market_price - price
-
     percent = round((discount / market_price) * 100)
+
+    recommended_bid = int(price * 0.9)
 
     if percent > 20:
         label = "🔥 SUPER DEAL"
@@ -34,44 +30,51 @@ def analyze_deal(price):
     else:
         label = "Normal"
 
-    recommended_bid = int(price * 0.9)
+    seller_signal = "Normal"
 
-    return market_price, percent, label, recommended_bid
+    if days > 20:
+        seller_signal = "📉 Motiverad säljare"
+
+    return market_price, percent, label, recommended_bid, seller_signal
 
 
-def scan_blocket():
+def pro_scan():
 
-    url = "https://www.blocket.se/bilar/sok"
+    sources = [
+    "Blocket",
+    "Wayke",
+    "Bytbil"
+    ]
 
-    try:
+    found = []
 
-        r = requests.get(url, timeout=5)
+    for i in range(10):
 
-        if r.status_code == 200:
+        found.append({
 
-            found = []
+        "title":f"Bilfynd {i+1}",
+        "brand":random.choice(["Volvo","BMW","Audi","Toyota"]),
+        "price":random.randint(180000,320000),
+        "days":random.randint(1,30),
+        "source":random.choice(sources)
 
-            for i in range(5):
+        })
 
-                found.append({
-                "title": f"Blocket bil {i+1}",
-                "brand": "Okänd",
-                "price": 200000 + i * 15000
-                })
-
-            return found
-
-    except:
-
-        return []
+    return found
 
 
 @app.route("/scan")
-def run_scan():
+def scan():
 
-    new_cars = scan_blocket()
+    results = pro_scan()
 
-    return {"found": new_cars}
+    return {"found":results}
+
+
+@app.route("/api/cars")
+def api():
+
+    return jsonify(cars)
 
 
 @app.route("/")
@@ -89,7 +92,7 @@ def home():
         filtered = [c for c in filtered if c["price"] <= int(max_price)]
 
     html = """
-    <h1>🔥 Bilfynd</h1>
+    <h1>🔥 Bilfynd Pro</h1>
 
     <form>
 
@@ -111,7 +114,7 @@ def home():
 
     </form>
 
-    <p><a href="/scan">🔎 Kör Bilscanner</a></p>
+    <p><a href="/scan">🚀 Kör Pro Scanner</a></p>
 
     <hr>
     """
@@ -120,7 +123,7 @@ def home():
 
     for car in filtered:
 
-        market_price, percent, label, recommended_bid = analyze_deal(car["price"])
+        market_price, percent, label, recommended_bid, seller_signal = analyze_deal(car["price"],car["days"])
 
         deals.append((percent, car))
 
@@ -134,11 +137,15 @@ def home():
 
         <p>Pris: {car['price']} kr</p>
 
+        <p>Annons ute: {car['days']} dagar</p>
+
         <p>Marknadspris: {market_price} kr</p>
 
         <p>Pris under marknad: {percent}%</p>
 
         <p>{label}</p>
+
+        <p>{seller_signal}</p>
 
         <p>AI rekommenderat bud: {recommended_bid} kr</p>
 
