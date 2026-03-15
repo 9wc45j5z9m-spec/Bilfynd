@@ -1,17 +1,74 @@
 import os
 import random
+import sqlite3
 from flask import Flask, request
 
 app = Flask(__name__)
 
-cars = [
-{"title":"Volvo V90 D4","brand":"Volvo","price":219000,"days":5,"link":"https://www.blocket.se"},
-{"title":"Audi A6 Avant","brand":"Audi","price":229000,"days":18,"link":"https://www.blocket.se"},
-{"title":"BMW 520d Touring","brand":"BMW","price":239000,"days":10,"link":"https://www.wayke.se"},
-{"title":"Toyota RAV4 Hybrid","brand":"Toyota","price":259000,"days":3,"link":"https://www.bytbil.com"},
-{"title":"Tesla Model 3","brand":"Tesla","price":349000,"days":1,"link":"https://www.blocket.se"},
-{"title":"Mercedes E220d","brand":"Mercedes","price":279000,"days":25,"link":"https://www.bytbil.com"}
-]
+
+def init_db():
+
+    conn = sqlite3.connect("cars.db")
+    c = conn.cursor()
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS cars(
+        title TEXT,
+        brand TEXT,
+        price INTEGER,
+        days INTEGER,
+        link TEXT,
+        source TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+
+def save_car(car):
+
+    conn = sqlite3.connect("cars.db")
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT INTO cars VALUES (?,?,?,?,?,?)
+    """,(
+        car["title"],
+        car["brand"],
+        car["price"],
+        car["days"],
+        car["link"],
+        car["source"]
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_cars():
+
+    conn = sqlite3.connect("cars.db")
+    c = conn.cursor()
+
+    rows = c.execute("SELECT * FROM cars").fetchall()
+
+    conn.close()
+
+    cars=[]
+
+    for r in rows:
+
+        cars.append({
+        "title":r[0],
+        "brand":r[1],
+        "price":r[2],
+        "days":r[3],
+        "link":r[4],
+        "source":r[5]
+        })
+
+    return cars
 
 
 def analyze_deal(price, days):
@@ -29,96 +86,80 @@ def analyze_deal(price, days):
     else:
         label = "Normal"
 
-    seller_signal = ""
+    seller_signal=""
 
     if days > 20:
-        seller_signal = "📉 Motiverad säljare"
+        seller_signal="📉 Motiverad säljare"
 
     return market_price, percent, label, recommended_bid, seller_signal
 
 
-def pro_scan():
+def crawl():
 
-    sources = [
+    brands=["Volvo","BMW","Audi","Toyota","Tesla","Mercedes"]
+
+    sources=[
     ("Blocket","https://www.blocket.se"),
     ("Wayke","https://www.wayke.se"),
     ("Bytbil","https://www.bytbil.com")
     ]
 
-    found = []
+    for i in range(20):
 
-    for i in range(12):
+        source=random.choice(sources)
 
-        source = random.choice(sources)
+        car={
 
-        found.append({
-
-        "title":f"Bilannons {i+1}",
-        "brand":random.choice(["Volvo","BMW","Audi","Toyota"]),
+        "title":f"Bilannons {random.randint(1000,9999)}",
+        "brand":random.choice(brands),
         "price":random.randint(180000,320000),
         "days":random.randint(1,30),
         "link":source[1],
         "source":source[0]
 
-        })
+        }
 
-    return found
+        save_car(car)
 
 
-@app.route("/scan")
-def scan():
+@app.route("/crawl")
+def run_crawler():
 
-    results = pro_scan()
+    crawl()
 
-    html = "<h1>🔎 Scannerresultat</h1>"
-
-    for car in results:
-
-        html += f"""
-        <div style='border:1px solid #ccc;padding:10px;margin:10px'>
-
-        <h2>{car['title']}</h2>
-
-        <p>Märke: {car['brand']}</p>
-
-        <p>Pris: {car['price']} kr</p>
-
-        <p>Källa: {car['source']}</p>
-
-        <a href="{car['link']}" target="_blank">🔗 Öppna annons</a>
-
-        </div>
-        """
-
-    return html
+    return "Crawler körd! Gå tillbaka till startsidan."
 
 
 @app.route("/")
 def home():
 
-    html = """
+    cars=get_cars()
+
+    html="""
     <h1>🔥 Bilfynd AI</h1>
 
-    <p><a href="/scan">🚀 Kör AI Scanner</a></p>
+    <p><a href="/crawl">🚀 Kör Crawler</a></p>
 
     <hr>
     """
 
-    deals = []
+    deals=[]
 
     for car in cars:
 
         market_price, percent, label, recommended_bid, seller_signal = analyze_deal(car["price"],car["days"])
 
-        deals.append((percent, car))
+        deals.append((percent,car))
 
-        html += f"""
+        html+=f"""
 
         <div style='border:1px solid #ccc;padding:10px;margin:10px'>
 
         <h2>{car['title']}</h2>
 
         <p>Märke: {car['brand']}</p>
+
+        <p>Källa: {car['source']}</p>
 
         <p>Pris: {car['price']} kr</p>
 
@@ -152,15 +193,15 @@ def home():
 
         """
 
-    html += "<h2>📡 Deal Radar</h2>"
+    html+="<h2>📡 Deal Radar</h2>"
 
     deals.sort(key=lambda x: x[0], reverse=True)
 
     for percent, car in deals:
 
-        if percent > 10:
+        if percent>10:
 
-            html += f"<p><a href='{car['link']}' target='_blank'>{car['title']}</a> - {percent}% under marknad</p>"
+            html+=f"<p><a href='{car['link']}' target='_blank'>{car['title']}</a> - {percent}% under marknad</p>"
 
     return html
 
@@ -168,8 +209,8 @@ def home():
 @app.route("/bid")
 def bid():
 
-    car = request.args.get("car")
-    bid = request.args.get("bid")
+    car=request.args.get("car")
+    bid=request.args.get("bid")
 
     return f"""
 
@@ -188,8 +229,11 @@ def bid():
     """
 
 
+init_db()
+
+
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 5000))
+    port=int(os.environ.get("PORT",5000))
 
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0",port=port)
