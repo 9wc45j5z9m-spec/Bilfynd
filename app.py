@@ -4,13 +4,14 @@ from flask import Flask, request
 app = Flask(__name__)
 
 cars = [
-    {"title": "Volvo V90 D4", "price": 219000},
-    {"title": "Audi A6 Avant", "price": 229000}
+    {"title": "Volvo V90 D4", "brand": "Volvo", "price": 219000},
+    {"title": "Audi A6 Avant", "brand": "Audi", "price": 229000},
+    {"title": "BMW 520d Touring", "brand": "BMW", "price": 239000},
+    {"title": "Toyota RAV4 Hybrid", "brand": "Toyota", "price": 259000}
 ]
 
 
 def analyze_deal(price):
-
     market_price = int(price * 1.15)
     discount = market_price - price
     percent = round((discount / market_price) * 100)
@@ -30,16 +31,53 @@ def analyze_deal(price):
 @app.route("/")
 def home():
 
-    html = "<h1>🔥 Bilfynd</h1>"
+    brand_filter = request.args.get("brand")
+    max_price = request.args.get("max_price")
 
-    for car in cars:
+    filtered = cars
+
+    if brand_filter:
+        filtered = [c for c in filtered if c["brand"] == brand_filter]
+
+    if max_price:
+        filtered = [c for c in filtered if c["price"] <= int(max_price)]
+
+    html = """
+    <h1>🔥 Bilfynd</h1>
+
+    <form>
+    Märke:
+    <select name="brand">
+    <option value="">Alla</option>
+    <option>Volvo</option>
+    <option>Audi</option>
+    <option>BMW</option>
+    <option>Toyota</option>
+    </select>
+
+    Maxpris:
+    <input name="max_price" placeholder="t.ex 230000">
+
+    <button>Filtrera</button>
+    </form>
+
+    <hr>
+    """
+
+    deals = []
+
+    for car in filtered:
 
         market_price, percent, label, recommended_bid = analyze_deal(car["price"])
+
+        deals.append((percent, car))
 
         html += f"""
         <div style='border:1px solid #ccc;padding:10px;margin:10px'>
 
         <h2>{car['title']}</h2>
+
+        <p>Märke: {car['brand']}</p>
 
         <p>Pris: {car['price']} kr</p>
 
@@ -59,6 +97,13 @@ def home():
 
         </div>
         """
+
+    html += "<h2>📡 Deal Radar</h2>"
+
+    deals.sort(reverse=True)
+
+    for percent, car in deals[:3]:
+        html += f"<p>{car['title']} - {percent}% under marknad</p>"
 
     return html
 
@@ -80,6 +125,7 @@ def bid():
 
     <p>Jag utlovar en smidig affär om du accepterar mitt bud.</p>
 
+    <p>Vänligen återkom till mig.</p>
     """
 
 
