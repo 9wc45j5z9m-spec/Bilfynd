@@ -12,6 +12,7 @@ cars = [
 
 
 def analyze_deal(price):
+
     market_price = int(price * 1.15)
     discount = market_price - price
     percent = round((discount / market_price) * 100)
@@ -100,7 +101,7 @@ def home():
 
     html += "<h2>📡 Deal Radar</h2>"
 
-    deals.sort(reverse=True)
+    deals.sort(key=lambda x: x[0], reverse=True)
 
     for percent, car in deals[:3]:
         html += f"<p>{car['title']} - {percent}% under marknad</p>"
